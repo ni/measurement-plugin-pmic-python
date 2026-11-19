@@ -25,6 +25,7 @@ from configure_dc_power import (
     split_resource_name,
     SweepType,
 )
+from ni.protobuf.types.xydata_pb2 import DoubleXYData
 from ni_measurement_plugin_sdk_service.session_management import (
     INSTRUMENT_TYPE_NI_DCPOWER,
 )
@@ -35,10 +36,26 @@ MeasurementResult = tuple[
     int,
     int,
     list[float],
-    list[float],
-    list[float],
-    list[float],
+    list[DoubleXYData],
+    list[DoubleXYData],
+    list[DoubleXYData],
 ]
+
+
+def build_xy_curves(
+    load_currents: list[float], values: list[float], points_per_curve: int
+) -> list[DoubleXYData]:
+    """Build one load current vs. value curve for each source voltage."""
+    if points_per_curve < 1:
+        return []
+    return [
+        DoubleXYData(
+            x_data=load_currents[start : start + points_per_curve],
+            y_data=values[start : start + points_per_curve],
+        )
+        for start in range(0, len(values), points_per_curve)
+    ]
+
 
 script_or_exe = sys.executable if getattr(sys, "frozen", False) else __file__
 service_directory = pathlib.Path(script_or_exe).resolve().parent
@@ -90,9 +107,9 @@ measurement_service = nims.MeasurementService(
 @measurement_service.output("Source sweep points", nims.DataType.Int32)
 @measurement_service.output("Load sweep points", nims.DataType.Int32)
 @measurement_service.output("Load currents", nims.DataType.DoubleArray1D)
-@measurement_service.output("Efficiency", nims.DataType.DoubleArray1D)
-@measurement_service.output("Load voltages", nims.DataType.DoubleArray1D)
-@measurement_service.output("Load voltage deviation", nims.DataType.DoubleArray1D)
+@measurement_service.output("Efficiency", nims.DataType.DoubleXYDataArray1D)
+@measurement_service.output("Load voltages", nims.DataType.DoubleXYDataArray1D)
+@measurement_service.output("Load voltage deviation", nims.DataType.DoubleXYDataArray1D)
 def measure(
     mode_of_operation: ModeOfOperation,
     dut_setup_time: float,
@@ -228,9 +245,9 @@ def measure(
                     source_sweep_points,
                     load_sweep_points,
                     load_currents,
-                    efficiency,
-                    load_voltages,
-                    load_voltage_deviation,
+                    build_xy_curves(load_currents, efficiency, load_sweep_points),
+                    build_xy_curves(load_currents, load_voltages, load_sweep_points),
+                    build_xy_curves(load_currents, load_voltage_deviation, load_sweep_points),
                 )
 
             reset_sessions(
@@ -266,9 +283,9 @@ def measure(
         source_sweep_points,
         load_sweep_points,
         load_currents,
-        efficiency,
-        load_voltages,
-        load_voltage_deviation,
+        build_xy_curves(load_currents, efficiency, load_sweep_points),
+        build_xy_curves(load_currents, load_voltages, load_sweep_points),
+        build_xy_curves(load_currents, load_voltage_deviation, load_sweep_points),
     )
 
 
