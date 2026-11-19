@@ -12,8 +12,10 @@ from configure_dc_power import (
     configure_load,
     configure_source,
     Event,
+    find_session_info,
     format_power_on_result,
     generate_sequence,
+    get_device_and_channel,
     initiate_load,
     initiate_source,
     ModeOfOperation,
@@ -21,8 +23,6 @@ from configure_dc_power import (
     power_off_dut,
     power_on_dut,
     reset_sessions,
-    Session,
-    split_resource_name,
     SweepType,
 )
 from ni.protobuf.types.xydata_pb2 import DoubleXYData
@@ -140,18 +140,17 @@ def measure(
     load_voltage_deviation: list[float] = []
 
     if mode_of_operation == ModeOfOperation.Power_On_DUT:
-        source_resource_name, source_device_channel = split_resource_name(source_resource_name)
-        voltage, current = power_on_dut(
-            source_resource_name,
-            source_device_channel,
-            source_start_voltage,
-            source_current_limit,
-        )
+        with measurement_service.context.reserve_session(source_resource_name) as reservation:
+            with reservation.initialize_nidcpower_session() as source_info:
+                voltage, current = power_on_dut(
+                    source_info.session,
+                    source_info.channel_list,
+                    source_start_voltage,
+                    source_current_limit,
+                )
         status = format_power_on_result(voltage, current)
 
     elif mode_of_operation == ModeOfOperation.PerformMeasurement:
-        source_resource_name, source_device_channel = split_resource_name(source_resource_name)
-        load_resource_name, load_device_channel = split_resource_name(load_resource_name)
         if load_sweep_type == SweepType.Logarithmic:
             load_sweep_type_enum = SweepType.Logarithmic
         elif load_sweep_type == SweepType.Linear:
@@ -159,122 +158,142 @@ def measure(
         else:
             raise ValueError(f"{load_sweep_type} Sweep Type is not supported ")
 
-        source_session = Session(source_resource_name, source_device_channel)
-        load_session = Session(load_resource_name, load_device_channel)
-        try:
-            voltage_values = generate_sequence(
-                SweepType.Linear,
-                source_start_voltage,
-                source_stop_voltage,
-                source_voltage_sweep_points,
-            )
-            initiate_source(
-                source_session,
-                source_device_channel,
-                source_start_voltage,
-                source_current_limit,
-                source_maximum_power,
-                dut_setup_time,
-            )
-            initiate_load(
-                load_session,
-                load_device_channel,
-                load_start_current,
-                load_voltage_limit_range,
-                dut_setup_time,
-            )
-            current_results = generate_sequence(
-                load_sweep_type_enum,
-                load_start_current,
-                load_stop_current,
-                load_current_sweep_points_points_per_decade,
-            )
-
-            load_sweep_points = len(current_results)
-            current_values = len(voltage_values) * current_results
-
-            configure_source(
-                source_session,
-                source_device_channel,
-                voltage_values,
-                source_current_limit,
-                source_maximum_power,
-                load_sweep_points,
-                source_delay,
-                aperture_time,
-            )
-            configure_load(
-                load_session,
-                load_device_channel,
-                current_values,
-                load_voltage_limit_range,
-                aperture_time,
-                build_trigger_terminal(
-                    source_resource_name, source_device_channel, "SourceTrigger"
-                ),
-                build_trigger_terminal(
-                    source_resource_name,
-                    source_device_channel,
-                    "SourceCompleteEvent",
-                ),
-            )
-
-            load_session.channels[load_device_channel].initiate()
-            source_session.channels[source_device_channel].initiate()
-            load_session.channels[load_device_channel].wait_for_event(
-                event_id=Event.SEQUENCE_ENGINE_DONE
-            )
-            source_sweep_points = len(voltage_values)
-
-            for _ in perform_measurements(
-                source_session,
-                source_device_channel,
-                load_session,
-                load_device_channel,
-                voltage_values,
-                load_sweep_points,
-                nominal_output_voltage,
-                load_currents,
-                load_voltages,
-                efficiency,
-                load_voltage_deviation,
-            ):
-                yield (
-                    status,
-                    voltage_values,
-                    source_sweep_points,
-                    load_sweep_points,
-                    load_currents,
-                    build_xy_curves(load_currents, efficiency, load_sweep_points),
-                    build_xy_curves(load_currents, load_voltages, load_sweep_points),
-                    build_xy_curves(load_currents, load_voltage_deviation, load_sweep_points),
+        pins = [source_resource_name, load_resource_name]
+        with measurement_service.context.reserve_sessions(pins) as reservation:
+            with reservation.initialize_nidcpower_sessions() as session_infos:
+                source_info = find_session_info(session_infos, source_resource_name)
+                load_info = find_session_info(session_infos, load_resource_name)
+                source_session = source_info.session
+                load_session = load_info.session
+                source_device_name, source_trigger_channel = get_device_and_channel(source_info)
+                logging.info(
+                    "Source: device=%s channel=%s (resource_name=%s channel_list=%s)",
+                    source_device_name,
+                    source_trigger_channel,
+                    source_info.resource_name,
+                    source_info.channel_list,
                 )
+                source_device_channel = source_info.channel_list
+                load_device_channel = load_info.channel_list
+                try:
+                    voltage_values = generate_sequence(
+                        SweepType.Linear,
+                        source_start_voltage,
+                        source_stop_voltage,
+                        source_voltage_sweep_points,
+                    )
+                    initiate_source(
+                        source_session,
+                        source_device_channel,
+                        source_start_voltage,
+                        source_current_limit,
+                        source_maximum_power,
+                        dut_setup_time,
+                    )
+                    initiate_load(
+                        load_session,
+                        load_device_channel,
+                        load_start_current,
+                        load_voltage_limit_range,
+                        dut_setup_time,
+                    )
+                    current_results = generate_sequence(
+                        load_sweep_type_enum,
+                        load_start_current,
+                        load_stop_current,
+                        load_current_sweep_points_points_per_decade,
+                    )
 
-            reset_sessions(
-                source_session,
-                source_device_channel,
-                load_session,
-                load_device_channel,
-            )
-            status = "The measurement is performed successfully"
-        except Exception:
-            reset_sessions(
-                source_session,
-                source_device_channel,
-                load_session,
-                load_device_channel,
-            )
-            raise
+                    load_sweep_points = len(current_results)
+                    current_values = len(voltage_values) * current_results
+
+                    configure_source(
+                        source_session,
+                        source_device_channel,
+                        voltage_values,
+                        source_current_limit,
+                        source_maximum_power,
+                        load_sweep_points,
+                        source_delay,
+                        aperture_time,
+                    )
+                    configure_load(
+                        load_session,
+                        load_device_channel,
+                        current_values,
+                        load_voltage_limit_range,
+                        aperture_time,
+                        build_trigger_terminal(
+                            source_device_name, source_trigger_channel, "SourceTrigger"
+                        ),
+                        build_trigger_terminal(
+                            source_device_name,
+                            source_trigger_channel,
+                            "SourceCompleteEvent",
+                        ),
+                    )
+
+                    load_session.channels[load_device_channel].initiate()
+                    source_session.channels[source_device_channel].initiate()
+                    load_session.channels[load_device_channel].wait_for_event(
+                        event_id=Event.SEQUENCE_ENGINE_DONE
+                    )
+                    source_sweep_points = len(voltage_values)
+
+                    for _ in perform_measurements(
+                        source_session,
+                        source_device_channel,
+                        load_session,
+                        load_device_channel,
+                        voltage_values,
+                        load_sweep_points,
+                        nominal_output_voltage,
+                        load_currents,
+                        load_voltages,
+                        efficiency,
+                        load_voltage_deviation,
+                    ):
+                        yield (
+                            status,
+                            voltage_values,
+                            source_sweep_points,
+                            load_sweep_points,
+                            load_currents,
+                            build_xy_curves(load_currents, efficiency, load_sweep_points),
+                            build_xy_curves(load_currents, load_voltages, load_sweep_points),
+                            build_xy_curves(
+                                load_currents, load_voltage_deviation, load_sweep_points
+                            ),
+                        )
+
+                    reset_sessions(
+                        source_session,
+                        source_device_channel,
+                        load_session,
+                        load_device_channel,
+                    )
+                    status = "The measurement is performed successfully"
+                except Exception:
+                    reset_sessions(
+                        source_session,
+                        source_device_channel,
+                        load_session,
+                        load_device_channel,
+                    )
+                    raise
 
     elif mode_of_operation == ModeOfOperation.Power_Off_DUT:
-        source_resource_name, source_device_channel = split_resource_name(source_resource_name)
-        load_resource_name, load_device_channel = split_resource_name(load_resource_name)
-        power_off_dut(
-            source_resource_name,
-            source_device_channel,
-            load_resource_name,
-            load_device_channel,
-        )
+        pins = [source_resource_name, load_resource_name]
+        with measurement_service.context.reserve_sessions(pins) as reservation:
+            with reservation.initialize_nidcpower_sessions() as session_infos:
+                source_info = find_session_info(session_infos, source_resource_name)
+                load_info = find_session_info(session_infos, load_resource_name)
+                power_off_dut(
+                    source_info.session,
+                    source_info.channel_list,
+                    load_info.session,
+                    load_info.channel_list,
+                )
         status = "The DUT is powered off"
 
     return (

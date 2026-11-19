@@ -1,8 +1,9 @@
 """niDCPower configuration and measurement helpers."""
 
-from collections.abc import Generator
+from collections.abc import Generator, Sequence
 from enum import Enum
 
+from ni_measurement_plugin_sdk_service.session_management import SessionInformation
 from nidcpower import (
     Error,
     Event,
@@ -111,22 +112,26 @@ def build_trigger_terminal(resource_name: str, channel_name: str, event_name: st
     return f"/{resource_name}/Engine{channel_name}/{event_name}"
 
 
-def split_resource_name(resource_name: str, default_channel: str = "0") -> tuple[str, str]:
-    """Split an IO resource into device name and channel, if a channel is present."""
-    device_name, separator, channel_name = resource_name.rpartition("/")
-    if not separator:
-        return resource_name, default_channel
-    if not device_name or not channel_name:
-        raise ValueError(f"Invalid instrument resource name: {resource_name!r}")
-    return device_name, channel_name
+def find_session_info(session_infos: Sequence[SessionInformation], pin: str) -> SessionInformation:
+    """Return the session that drives the given pin."""
+    for session_info in session_infos:
+        if any(mapping.pin_or_relay_name == pin for mapping in session_info.channel_mappings):
+            return session_info
+    raise ValueError(f"No NI-DCPower session found for pin {pin!r}.")
+
+
+def get_device_and_channel(session_info: SessionInformation) -> tuple[str, str]:
+    """Return the device name and channel number of the first channel in the session."""
+    channel = next(iter(session_info.channel_mappings)).channel
+    device_name, _, channel_number = channel.rpartition("/")
+    return device_name or session_info.resource_name, channel_number
 
 
 # function to start source device and keep it in running state
 def power_on_dut(
-    resource_name: str, channel_name: str, voltage_level: float, current_limit: float
+    session: Session, channel_name: str, voltage_level: float, current_limit: float
 ) -> tuple[float, float]:
     """Power on the DUT and return the measured voltage and current."""
-    session = Session(resource_name=resource_name, channels=channel_name)
     try:
         # configure the session
         session.channels[channel_name].sense = Sense.REMOTE
@@ -148,40 +153,29 @@ def power_on_dut(
         current = session.channels[channel_name].measure(measurement_type=MeasurementTypes.CURRENT)
 
         session.channels[channel_name].abort()
-        session.close()
 
         return voltage, current
 
     except Error:
         session.channels[channel_name].abort()
-        session.output_enabled = False
+        session.channels[channel_name].output_enabled = False
         session.channels[channel_name].reset()
-        session.close()
         raise
-
-    pass
 
 
 # function to stop both source and load devices power
 def power_off_dut(
-    source_resource_name: str,
+    source_session: Session,
     source_device_channel: str,
-    load_resource_name: str,
+    load_session: Session,
     load_device_channel: str,
 ) -> None:
     """Disable and reset both the source and load."""
-    source_session = Session(resource_name=source_resource_name, channels=source_device_channel)
-    load_session = Session(resource_name=load_resource_name, channels=load_device_channel)
-
     source_session.channels[source_device_channel].output_enabled = False
     load_session.channels[load_device_channel].output_enabled = False
 
     source_session.channels[source_device_channel].reset()
     load_session.channels[load_device_channel].reset()
-
-    source_session.close()
-    load_session.close()
-    return
 
 
 # function to power off power supplies in case of error in perform measurement
@@ -191,7 +185,7 @@ def reset_sessions(
     load_session: Session,
     load_device_channel: str,
 ) -> None:
-    """Abort, disable, reset, and close both instrument sessions."""
+    """Abort, disable, and reset both instruments. The SDK closes the sessions."""
     source_session.channels[source_device_channel].abort()
     load_session.channels[load_device_channel].abort()
 
@@ -200,9 +194,6 @@ def reset_sessions(
 
     source_session.channels[source_device_channel].reset()
     load_session.channels[load_device_channel].reset()
-
-    source_session.close()
-    load_session.close()
 
 
 # function to start source device and keep power sourcing on
