@@ -2,6 +2,7 @@
 
 from collections.abc import Generator, Sequence
 from enum import Enum
+from typing import NamedTuple
 
 from ni_measurement_plugin_sdk_service.session_management import SessionInformation
 from nidcpower import (
@@ -112,19 +113,27 @@ def build_trigger_terminal(resource_name: str, channel_name: str, event_name: st
     return f"/{resource_name}/Engine{channel_name}/{event_name}"
 
 
-def find_session_info(session_infos: Sequence[SessionInformation], pin: str) -> SessionInformation:
-    """Return the session that drives the given pin."""
-    for session_info in session_infos:
-        if any(mapping.pin_or_relay_name == pin for mapping in session_info.channel_mappings):
-            return session_info
-    raise ValueError(f"No NI-DCPower session found for pin {pin!r}.")
+class ResolvedPin(NamedTuple):
+    """The NI-DCPower session, device name and channel that a pin maps to."""
+
+    session: Session
+    device_name: str
+    channel: str
 
 
-def get_device_and_channel(session_info: SessionInformation) -> tuple[str, str]:
-    """Return the device name and channel number of the first channel in the session."""
-    channel = next(iter(session_info.channel_mappings)).channel
-    device_name, _, channel_number = channel.rpartition("/")
-    return device_name or session_info.resource_name, channel_number
+def resolve_pin(session_infos: Sequence[SessionInformation], pin: str) -> ResolvedPin:
+    """Resolve a pin to its single NI-DCPower session, device and channel."""
+    matches = [
+        (info, mapping.channel)
+        for info in session_infos
+        for mapping in info.channel_mappings
+        if mapping.pin_or_relay_name == pin
+    ]
+    if len(matches) != 1:
+        raise ValueError(f"Pin {pin!r} must map to exactly one NI-DCPower channel.")
+    info, mapped_channel = matches[0]
+    device_name, _, channel = mapped_channel.rpartition("/")
+    return ResolvedPin(info.session, device_name or info.resource_name, channel)
 
 
 # function to start source device and keep it in running state

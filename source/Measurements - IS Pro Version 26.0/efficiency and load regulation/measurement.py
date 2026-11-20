@@ -12,10 +12,8 @@ from configure_dc_power import (
     configure_load,
     configure_source,
     Event,
-    find_session_info,
     format_power_on_result,
     generate_sequence,
-    get_device_and_channel,
     initiate_load,
     initiate_source,
     ModeOfOperation,
@@ -23,6 +21,7 @@ from configure_dc_power import (
     power_off_dut,
     power_on_dut,
     reset_sessions,
+    resolve_pin,
     SweepType,
 )
 from ni.protobuf.types.xydata_pb2 import DoubleXYData
@@ -127,7 +126,7 @@ def measure(
     load_sweep_type: SweepType,
     load_start_current: float,
     load_stop_current: float,
-    load_current_sweep_points_points_per_decade: int,
+    load_current_sweep_points_or_points_per_decade: int,
 ) -> Generator[MeasurementResult, None, MeasurementResult]:
     """Run the selected power, efficiency, or load-regulation operation."""
     status = ""
@@ -141,40 +140,37 @@ def measure(
 
     if mode_of_operation == ModeOfOperation.Power_On_DUT:
         with measurement_service.context.reserve_session(source_resource_name) as reservation:
-            with reservation.initialize_nidcpower_session() as source_info:
+            with reservation.initialize_nidcpower_session() as session_info:
+                source_session, _, source_channel = resolve_pin(
+                    [session_info], source_resource_name
+                )
                 voltage, current = power_on_dut(
-                    source_info.session,
-                    source_info.channel_list,
+                    source_session,
+                    source_channel,
                     source_start_voltage,
                     source_current_limit,
                 )
         status = format_power_on_result(voltage, current)
 
     elif mode_of_operation == ModeOfOperation.PerformMeasurement:
-        if load_sweep_type == SweepType.Logarithmic:
-            load_sweep_type_enum = SweepType.Logarithmic
-        elif load_sweep_type == SweepType.Linear:
-            load_sweep_type_enum = SweepType.Linear
-        else:
+        if load_sweep_type not in (SweepType.Logarithmic, SweepType.Linear):
             raise ValueError(f"{load_sweep_type} Sweep Type is not supported ")
 
         pins = [source_resource_name, load_resource_name]
         with measurement_service.context.reserve_sessions(pins) as reservation:
             with reservation.initialize_nidcpower_sessions() as session_infos:
-                source_info = find_session_info(session_infos, source_resource_name)
-                load_info = find_session_info(session_infos, load_resource_name)
-                source_session = source_info.session
-                load_session = load_info.session
-                source_device_name, source_trigger_channel = get_device_and_channel(source_info)
-                logging.info(
-                    "Source: device=%s channel=%s (resource_name=%s channel_list=%s)",
-                    source_device_name,
-                    source_trigger_channel,
-                    source_info.resource_name,
-                    source_info.channel_list,
+                source_session, source_device_name, source_device_channel = resolve_pin(
+                    session_infos, source_resource_name
                 )
-                source_device_channel = source_info.channel_list
-                load_device_channel = load_info.channel_list
+                load_session, _, load_device_channel = resolve_pin(
+                    session_infos, load_resource_name
+                )
+                logging.info(
+                    "Source: device=%s channel=%s | Load: channel=%s",
+                    source_device_name,
+                    source_device_channel,
+                    load_device_channel,
+                )
                 try:
                     voltage_values = generate_sequence(
                         SweepType.Linear,
@@ -197,15 +193,15 @@ def measure(
                         load_voltage_limit_range,
                         dut_setup_time,
                     )
-                    current_results = generate_sequence(
-                        load_sweep_type_enum,
+                    load_sweep_currents = generate_sequence(
+                        load_sweep_type,
                         load_start_current,
                         load_stop_current,
-                        load_current_sweep_points_points_per_decade,
+                        load_current_sweep_points_or_points_per_decade,
                     )
 
-                    load_sweep_points = len(current_results)
-                    current_values = len(voltage_values) * current_results
+                    load_sweep_points = len(load_sweep_currents)
+                    current_values = len(voltage_values) * load_sweep_currents
 
                     configure_source(
                         source_session,
@@ -224,11 +220,11 @@ def measure(
                         load_voltage_limit_range,
                         aperture_time,
                         build_trigger_terminal(
-                            source_device_name, source_trigger_channel, "SourceTrigger"
+                            source_device_name, source_device_channel, "SourceTrigger"
                         ),
                         build_trigger_terminal(
                             source_device_name,
-                            source_trigger_channel,
+                            source_device_channel,
                             "SourceCompleteEvent",
                         ),
                     )
@@ -266,34 +262,22 @@ def measure(
                             ),
                         )
 
-                    reset_sessions(
-                        source_session,
-                        source_device_channel,
-                        load_session,
-                        load_device_channel,
-                    )
                     status = "The measurement is performed successfully"
-                except Exception:
+                finally:
                     reset_sessions(
                         source_session,
                         source_device_channel,
                         load_session,
                         load_device_channel,
                     )
-                    raise
 
     elif mode_of_operation == ModeOfOperation.Power_Off_DUT:
         pins = [source_resource_name, load_resource_name]
         with measurement_service.context.reserve_sessions(pins) as reservation:
             with reservation.initialize_nidcpower_sessions() as session_infos:
-                source_info = find_session_info(session_infos, source_resource_name)
-                load_info = find_session_info(session_infos, load_resource_name)
-                power_off_dut(
-                    source_info.session,
-                    source_info.channel_list,
-                    load_info.session,
-                    load_info.channel_list,
-                )
+                source_session, _, source_channel = resolve_pin(session_infos, source_resource_name)
+                load_session, _, load_channel = resolve_pin(session_infos, load_resource_name)
+                power_off_dut(source_session, source_channel, load_session, load_channel)
         status = "The DUT is powered off"
 
     return (
