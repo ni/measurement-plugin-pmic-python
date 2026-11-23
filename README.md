@@ -10,6 +10,7 @@
    - Ripple
    - Line Regulation
    - Efficiency and Load Regulation
+   - PSRR (IS Pro Version 26.0 only)
 
 Click here for a detailed list of measurements and their functionality: [Measurement List](docs/measurements/meas-index.md)
 
@@ -43,7 +44,8 @@ Install from NI Package Manager:
 - Measurement Link (2024 Q1 or higher; 24.0 plug-ins only)
 - NI SDC Add-On (2023 Q4 or higher) (note: only if using DPI for DUT communication)
 - NI-DCPower (2023 Q4 or higher)
-- NI-Scope (2023 Q4 or higher) (note: required for ripple)
+- NI-FGEN (note: required for PSRR)
+- NI-Scope (2023 Q4 or higher) (note: required for PSRR and ripple)
 
 Download the latest NI package from the releases section of this repo or add the feed to NI Package Manager to get updates from this repo and other in this community. To use the NI Package Manager feeds, refer to this: [Subscribing to package feeds](https://github.com/NI-MeasurementLink-Plug-Ins/package-manager-feeds)
 

@@ -376,3 +376,4 @@ def perform_measurements(
             )
             yield
     yield
+

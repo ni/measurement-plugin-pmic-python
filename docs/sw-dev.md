@@ -3,14 +3,12 @@ If you want to commit changes to the repo, we recommend you use the current vers
 
 ## Software dependencies:
 
-- Python >= 3.8 (3.9 recommended)
-
 Install the below packages from NIPM
 
 - Measurement Link (2024 Q1 or higher; 24.0 plug-ins only)
 - NI-DCPower (2023 Q4 or higher)
 - NI-FGEN (note: required for PSRR)
-- NI-Scope (2023 Q4 or higher) (note: required for ripple)
+- NI-Scope (2023 Q4 or higher) (note: required for PSRR and ripple)
 
 Refer to [this](https://www.ni.com/docs/en-US/bundle/measurementlink/page/python-measurement-dependencies.html) document for python measurement dependencies.
 
@@ -19,6 +17,8 @@ Refer to [this](https://www.ni.com/docs/en-US/bundle/measurementlink/page/python
 The plug-in sets in [source](../source) target different InstrumentStudio Pro versions and use different measurement SDKs. Set up the environment for the version you are working on, and use a separate virtual environment for each set. See the [README](../README.md#plug-in-versions) for details.
 
 ### InstrumentStudio Pro 2024 (IS Pro Version 24.0)
+
+- Python >= 3.8 (3.9 recommended)
 
 Install the below packages using pip:
 
@@ -36,12 +36,13 @@ Tested with:
 
 ### InstrumentStudio Pro 2026 (IS Pro Version 26.0)
 
-Install the below packages using pip. Each plug-in's `requirements.txt` lists its own dependencies:
+Use Python 3.10 or higher.
 
-- ni-measurement-plugin-sdk-service
-- nidcpower
-- niscope
-- nifgen (PSRR only)
+Install each plug-in's dependencies using pip from its directory:
+
+```bash
+pip install -r requirements.txt
+```
 
 Source: [Measurements - IS Pro Version 26.0](../source/Measurements%20-%20IS%20Pro%20Version%2026.0)
 
