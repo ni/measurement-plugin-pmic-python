@@ -1,0 +1,20 @@
+{
+  "services": [
+    {
+      "displayName": "Line Regulation (Py)",
+      "serviceClass": "LineRegulation_PMIC_Python",
+      "descriptionUrl": "",
+      "providedInterfaces": [
+        "ni.measurementlink.measurement.v1.MeasurementService",
+        "ni.measurementlink.measurement.v2.MeasurementService"
+      ],
+      "path": "start.bat",
+      "version": "1.0.0.0",
+      "annotations": {
+        "ni/service.description": "Line Regulation measurement for PMIC",
+        "ni/service.collection": "PMIC",
+        "ni/service.tags": ["line regulation","pmic"]
+      }
+    }
+  ]
+}
