@@ -93,10 +93,9 @@ def generate_sequence(
 
 # function to determine current limit based on power boundary
 def get_current_limit(voltage_level: float, current_limit: float, power_limit: float) -> float:
-    """Apply the original source power boundary and current truncation."""
+    """Limit current to the configured source power boundary."""
     if voltage_level * current_limit > power_limit:
-        value = str(float(power_limit / voltage_level))
-        return float(value[: min(len(value), value.index(".") + 4)])
+        return power_limit / voltage_level
     return current_limit
 
 
