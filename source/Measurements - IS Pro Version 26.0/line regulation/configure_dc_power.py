@@ -107,7 +107,7 @@ def build_trigger_terminal(resource_name: str, channel_name: str, event_name: st
 
 
 class ResolvedPin(NamedTuple):
-    """The NI-DCPower session, device name and channel that a pin maps to."""
+    """The NI-DCPower session, device name and mapped channel identifier."""
 
     session: Session
     device_name: str
@@ -126,7 +126,7 @@ def resolve_pin(session_infos: Sequence[SessionInformation], pin: str) -> Resolv
         raise ValueError(f"Pin {pin!r} must map to exactly one NI-DCPower channel.")
     info, mapped_channel = matches[0]
     device_name, _, channel = mapped_channel.rpartition("/")
-    return ResolvedPin(info.session, device_name or info.resource_name, channel)
+    return ResolvedPin(info.session, device_name or info.resource_name, mapped_channel)
 
 
 # function to start source device and keep it in running state
@@ -159,7 +159,7 @@ def power_on_dut(
 
     except Error:
         session.channels[channel_name].abort()
-        session.output_enabled = False
+        session.channels[channel_name].output_enabled = False
         session.channels[channel_name].reset()
         raise
 

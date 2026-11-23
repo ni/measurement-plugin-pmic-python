@@ -170,9 +170,13 @@ def measure(
                         load_current_level,
                         load_voltage_limit_range,
                         aperture_time,
-                        build_trigger_terminal(source_device, source_channel, "SourceTrigger"),
                         build_trigger_terminal(
-                            source_device, source_channel, "SourceCompleteEvent"
+                            source_device, source_channel.rsplit("/", 1)[-1], "SourceTrigger"
+                        ),
+                        build_trigger_terminal(
+                            source_device,
+                            source_channel.rsplit("/", 1)[-1],
+                            "SourceCompleteEvent",
                         ),
                     )
                     load_session.channels[load_channel].initiate()
