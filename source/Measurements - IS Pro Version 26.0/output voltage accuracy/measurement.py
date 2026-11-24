@@ -7,11 +7,10 @@ from enum import Enum
 
 import click
 import ni_measurement_plugin_sdk_service as nims
-from _helpers import format_dut_info
 from configure_dcpower import (
     abort_channels,
-    configure_dcpower_load,
-    configure_dcpower_source,
+    configure_load,
+    configure_source,
     measure_voltage,
     power_off_dut,
     power_on_dut,
@@ -53,16 +52,20 @@ def perform_measurement(
 
 
 @measurement_service.register_measurement
+# On-Off feature
 @measurement_service.configuration(
     "Mode of operation",
     nims.DataType.Enum,
     ModeOfOperation.Perform_measurement,
     enum_type=ModeOfOperation,
 )
+# Measurement Settings
 @measurement_service.configuration("Dut setup time (s)", nims.DataType.Float, 1.0)
-# Aperture time is the period during which an ADC reads the voltage or current on an SMU.
+# Aperture time is the period during which an ADC reads the voltage or current
+# on a power supply or SMU
 @measurement_service.configuration("Aperture time (s)", nims.DataType.Float, 0.005)
 @measurement_service.configuration("Nominal output voltage (V)", nims.DataType.Float, 3.3)
+# Source Settings
 @measurement_service.configuration(
     "Source resource name",
     nims.DataType.IOResource,
@@ -71,6 +74,7 @@ def perform_measurement(
 )
 @measurement_service.configuration("Source voltage level (V)", nims.DataType.Float, 6.0)
 @measurement_service.configuration("Source current limit (A)", nims.DataType.Float, 25.0)
+# Load Settings
 @measurement_service.configuration(
     "Load resource name",
     nims.DataType.IOResource,
@@ -80,6 +84,7 @@ def perform_measurement(
 @measurement_service.configuration("Load current level (A)", nims.DataType.Float, 1.0)
 @measurement_service.configuration("Load voltage limit range (V)", nims.DataType.Float, 6.0)
 @measurement_service.configuration("Measurement duration (s)", nims.DataType.Float, 1.0)
+# configure outputs
 @measurement_service.output("Load voltage vs time", nims.DataType.DoubleXYData)
 @measurement_service.output("Measured output voltage(V)", nims.DataType.Float)
 @measurement_service.output("Output voltage accuracy (V)", nims.DataType.Float)
@@ -115,7 +120,10 @@ def measure(
                     source_voltage_level,
                     source_current_limit,
                 )
-        dut_status = format_dut_info("ON", supply_voltage, supply_current)
+        dut_status = (
+            f"The DUT is powered ON\nVoltage Level: {supply_voltage:.3f} V\n"
+            f"Current Limit: {supply_current:.3f} A"
+        )
 
     elif mode_of_operation == ModeOfOperation.Perform_measurement:
         pins = [source_resource_name, load_resource_name]
@@ -132,7 +140,7 @@ def measure(
                     load_channel,
                 )
                 try:
-                    configure_dcpower_source(
+                    configure_source(
                         source_session,
                         source_channel,
                         source_voltage_level,
@@ -142,7 +150,7 @@ def measure(
                     )
                     source_session.channels[source_channel].initiate()
 
-                    configure_dcpower_load(
+                    configure_load(
                         load_session,
                         load_channel,
                         load_current_level,
