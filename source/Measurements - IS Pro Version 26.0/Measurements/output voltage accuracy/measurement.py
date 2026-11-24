@@ -8,7 +8,7 @@ from enum import Enum
 import click
 import ni_measurement_plugin_sdk_service as nims
 from configure_dc_power import (
-    abort_channels,
+    reset_sessions,
     configure_load,
     configure_source,
     measure_voltage,
@@ -164,7 +164,7 @@ def measure(
                         load_session, load_channel, no_of_samples_to_fetch
                     )
                 finally:
-                    abort_channels(source_session, source_channel, load_session, load_channel)
+                    reset_sessions(source_session, source_channel, load_session, load_channel)
 
         # t = 0 is the first acquired sample; later samples are spaced by the NI-DCPower sample interval.
         total = 0.0
