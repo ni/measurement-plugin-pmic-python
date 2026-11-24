@@ -1,6 +1,7 @@
 ﻿"""Helper functions to configure and use NI-DCPower sessions."""
 
 from collections.abc import Sequence
+from datetime import timedelta
 from typing import NamedTuple
 
 from ni_measurement_plugin_sdk_service.session_management import SessionInformation
@@ -17,7 +18,7 @@ from nidcpower import (
 
 
 class ResolvedPin(NamedTuple):
-    """The NI-DCPower session, device name and channel that a pin maps to."""
+    """The NI-DCPower session, device name (for logging) and mapped channel selector of a pin."""
 
     session: Session
     device_name: str
@@ -37,8 +38,8 @@ def resolve_pin(session_infos: Sequence[SessionInformation], pin: str) -> Resolv
             f"Pin {pin!r} must map to exactly one NI-DCPower session.channels[channel_name]."
         )
     info, mapped_channel = matches[0]
-    device_name, _, channel = mapped_channel.rpartition("/")
-    return ResolvedPin(info.session, device_name or info.resource_name, channel)
+    device_name, _, _ = mapped_channel.rpartition("/")
+    return ResolvedPin(info.session, device_name or info.resource_name, mapped_channel)
 
 
 def configure_source(
@@ -119,8 +120,11 @@ def measure_dcpower(session: Session, channel_name: str) -> tuple[float, float]:
 
 def measure_voltage(
     session: Session, channel_name: str, no_of_samples_to_fetch: int
-) -> list[float]:
-    """Measure multiple voltage points."""
+) -> tuple[list[float], timedelta]:
+    """Measure multiple voltage points.
+
+    Returns the voltages and the time between samples reported by NI-DCPower.
+    """
     try:
         session.channels[channel_name].measure_record_length = no_of_samples_to_fetch
         session.channels[channel_name].measure_record_length_is_finite = True
@@ -128,18 +132,19 @@ def measure_voltage(
             MeasureWhen.AUTOMATICALLY_AFTER_SOURCE_COMPLETE
         )
         session.channels[channel_name].commit()
+        sample_interval = session.channels[channel_name].measure_record_delta_time
 
         volts = []
         with session.channels[channel_name].initiate():
             samples_acquired = 0
             while samples_acquired < no_of_samples_to_fetch:
                 measurements = session.channels[channel_name].fetch_multiple(
-                    count=session.fetch_backlog
+                    count=session.channels[channel_name].fetch_backlog
                 )
                 samples_acquired += len(measurements)
                 volts.extend(measurement.voltage for measurement in measurements)
 
-        return volts
+        return volts, sample_interval
 
     except Error:
         _disable_and_reset(session, channel_name)

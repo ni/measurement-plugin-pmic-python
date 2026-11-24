@@ -7,7 +7,7 @@ from enum import Enum
 
 import click
 import ni_measurement_plugin_sdk_service as nims
-from configure_dcpower import (
+from configure_dc_power import (
     abort_channels,
     configure_load,
     configure_source,
@@ -122,7 +122,7 @@ def measure(
                 )
         dut_status = (
             f"The DUT is powered ON\nVoltage Level: {supply_voltage:.3f} V\n"
-            f"Current Limit: {supply_current:.3f} A"
+            f"Measured Current: {supply_current:.3f} A"
         )
 
     elif mode_of_operation == ModeOfOperation.Perform_measurement:
@@ -160,19 +160,18 @@ def measure(
                     )
 
                     no_of_samples_to_fetch = int(measurement_duration / aperture_time) + 1
-                    measurements = measure_voltage(
+                    measurements, sample_interval = measure_voltage(
                         load_session, load_channel, no_of_samples_to_fetch
                     )
                 finally:
                     abort_channels(source_session, source_channel, load_session, load_channel)
 
-        length = len(measurements)
-        dt = measurement_duration / length
+        # t = 0 is the first acquired sample; later samples are spaced by the NI-DCPower sample interval.
         total = 0.0
-        for i in range(1, length + 1):
-            total += measurements[i - 1]
-            load_volt_vs_time.x_data.append(float(i * dt))
-            load_volt_vs_time.y_data.append(measurements[i - 1])
+        for i, voltage in enumerate(measurements):
+            total += voltage
+            load_volt_vs_time.x_data.append(i * sample_interval.total_seconds())
+            load_volt_vs_time.y_data.append(voltage)
 
         output_voltage, output_voltage_accuracy_mv, output_voltage_accuracy = perform_measurement(
             measurements, total, nominal_output_voltage
