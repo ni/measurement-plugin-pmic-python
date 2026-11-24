@@ -51,25 +51,20 @@ def configure_source(
     aperture_time: float,
 ) -> None:
     """Configure the source SMU."""
-    try:
-        session.channels[channel_name].sense = Sense.REMOTE
-        session.channels[channel_name].source_mode = SourceMode.SINGLE_POINT
-        session.channels[channel_name].output_function = OutputFunction.DC_VOLTAGE
+    session.channels[channel_name].sense = Sense.REMOTE
+    session.channels[channel_name].source_mode = SourceMode.SINGLE_POINT
+    session.channels[channel_name].output_function = OutputFunction.DC_VOLTAGE
 
-        session.channels[channel_name].voltage_level = voltage_level
-        session.channels[channel_name].current_limit = current_limit
+    session.channels[channel_name].voltage_level = voltage_level
+    session.channels[channel_name].current_limit = current_limit
 
-        session.channels[channel_name].voltage_level_autorange = True
-        session.channels[channel_name].current_limit_autorange = True
-        session.channels[channel_name].source_delay = dut_setup_time
-        session.channels[channel_name].aperture_time = aperture_time
-        session.channels[channel_name].measure_when = MeasureWhen.ON_DEMAND
+    session.channels[channel_name].voltage_level_autorange = True
+    session.channels[channel_name].current_limit_autorange = True
+    session.channels[channel_name].source_delay = dut_setup_time
+    session.channels[channel_name].aperture_time = aperture_time
+    session.channels[channel_name].measure_when = MeasureWhen.ON_DEMAND
 
-        session.channels[channel_name].commit()
-
-    except Error:
-        _disable_and_reset(session, channel_name)
-        raise
+    session.channels[channel_name].commit()
 
 
 def configure_load(
@@ -81,41 +76,31 @@ def configure_load(
     aperture_time: float,
 ) -> None:
     """Configure the load SMU."""
-    try:
-        session.channels[channel_name].sense = Sense.REMOTE
-        session.channels[channel_name].source_mode = SourceMode.SINGLE_POINT
-        session.channels[channel_name].output_function = OutputFunction.DC_CURRENT
+    session.channels[channel_name].sense = Sense.REMOTE
+    session.channels[channel_name].source_mode = SourceMode.SINGLE_POINT
+    session.channels[channel_name].output_function = OutputFunction.DC_CURRENT
 
-        session.channels[channel_name].configure_aperture_time(
-            aperture_time, units=ApertureTimeUnits.SECONDS
-        )
+    session.channels[channel_name].configure_aperture_time(
+        aperture_time, units=ApertureTimeUnits.SECONDS
+    )
 
-        session.channels[channel_name].current_level = current_level
-        session.channels[channel_name].current_level_autorange = True
-        session.channels[channel_name].voltage_limit_range = voltage_limit_range
-        session.channels[channel_name].source_delay = dut_setup_time
-        session.channels[channel_name].aperture_time = aperture_time
-        session.channels[channel_name].measure_when = MeasureWhen.ON_DEMAND
+    session.channels[channel_name].current_level = current_level
+    session.channels[channel_name].current_level_autorange = True
+    session.channels[channel_name].voltage_limit_range = voltage_limit_range
+    session.channels[channel_name].source_delay = dut_setup_time
+    session.channels[channel_name].aperture_time = aperture_time
+    session.channels[channel_name].measure_when = MeasureWhen.ON_DEMAND
 
-        session.channels[channel_name].commit()
-
-    except Error:
-        _disable_and_reset(session, channel_name)
-        raise
+    session.channels[channel_name].commit()
 
 
 def measure_dcpower(session: Session, channel_name: str) -> tuple[float, float]:
     """Measure the voltage and current."""
-    try:
-        with session.channels[channel_name].initiate():
-            session.channels[channel_name].wait_for_event(event_id=Event.SOURCE_COMPLETE, timeout=5)
-            measurements = session.channels[channel_name].measure_multiple()
+    with session.channels[channel_name].initiate():
+        session.channels[channel_name].wait_for_event(event_id=Event.SOURCE_COMPLETE, timeout=5)
+        measurements = session.channels[channel_name].measure_multiple()
 
-        return measurements[0].voltage, measurements[0].current
-
-    except Error:
-        _disable_and_reset(session, channel_name)
-        raise
+    return measurements[0].voltage, measurements[0].current
 
 
 def measure_voltage(
@@ -125,41 +110,40 @@ def measure_voltage(
 
     Returns the voltages and the time between samples reported by NI-DCPower.
     """
-    try:
-        session.channels[channel_name].measure_record_length = no_of_samples_to_fetch
-        session.channels[channel_name].measure_record_length_is_finite = True
-        session.channels[channel_name].measure_when = (
-            MeasureWhen.AUTOMATICALLY_AFTER_SOURCE_COMPLETE
-        )
-        session.channels[channel_name].commit()
-        sample_interval = session.channels[channel_name].measure_record_delta_time
+    session.channels[channel_name].measure_record_length = no_of_samples_to_fetch
+    session.channels[channel_name].measure_record_length_is_finite = True
+    session.channels[channel_name].measure_when = MeasureWhen.AUTOMATICALLY_AFTER_SOURCE_COMPLETE
+    session.channels[channel_name].commit()
+    sample_interval = session.channels[channel_name].measure_record_delta_time
 
-        volts = []
-        with session.channels[channel_name].initiate():
-            samples_acquired = 0
-            while samples_acquired < no_of_samples_to_fetch:
-                measurements = session.channels[channel_name].fetch_multiple(
-                    count=session.channels[channel_name].fetch_backlog
-                )
-                samples_acquired += len(measurements)
-                volts.extend(measurement.voltage for measurement in measurements)
+    volts = []
+    with session.channels[channel_name].initiate():
+        samples_acquired = 0
+        while samples_acquired < no_of_samples_to_fetch:
+            measurements = session.channels[channel_name].fetch_multiple(
+                count=session.channels[channel_name].fetch_backlog
+            )
+            samples_acquired += len(measurements)
+            volts.extend(measurement.voltage for measurement in measurements)
 
-        return volts, sample_interval
-
-    except Error:
-        _disable_and_reset(session, channel_name)
-        raise
+    return volts, sample_interval
 
 
-def abort_channels(
+def reset_sessions(
     source_session: Session,
     source_channel_name: str,
     load_session: Session,
     load_channel_name: str,
 ) -> None:
-    """Abort both instruments. The SDK closes the sessions."""
+    """Abort, disable, and reset both channels. The SDK closes the sessions."""
     source_session.channels[source_channel_name].abort()
     load_session.channels[load_channel_name].abort()
+
+    source_session.channels[source_channel_name].output_enabled = False
+    load_session.channels[load_channel_name].output_enabled = False
+
+    source_session.channels[source_channel_name].reset()
+    load_session.channels[load_channel_name].reset()
 
 
 def power_on_dut(
@@ -184,7 +168,9 @@ def power_on_dut(
         return voltage, current
 
     except Error:
-        _disable_and_reset(session, channel_name)
+        session.channels[channel_name].abort()
+        session.channels[channel_name].output_enabled = False
+        session.channels[channel_name].reset()
         raise
 
 
@@ -195,10 +181,8 @@ def power_off_dut(
     load_channel_name: str,
 ) -> None:
     """Disable and reset both the load and the source."""
-    _disable_and_reset(load_session, load_channel_name)
-    _disable_and_reset(source_session, source_channel_name)
+    source_session.channels[source_channel_name].output_enabled = False
+    load_session.channels[load_channel_name].output_enabled = False
 
-
-def _disable_and_reset(session: Session, channel_name: str) -> None:
-    session.channels[channel_name].output_enabled = False
-    session.channels[channel_name].reset()
+    source_session.channels[source_channel_name].reset()
+    load_session.channels[load_channel_name].reset()
