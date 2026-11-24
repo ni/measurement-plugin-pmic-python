@@ -10,8 +10,18 @@
    - Ripple
    - Line Regulation
    - Efficiency and Load Regulation
+   - PSRR (IS Pro Version 26.0 only)
 
 Click here for a detailed list of measurements and their functionality: [Measurement List](docs/measurements/meas-index.md)
+
+## Plug-in Versions
+
+The source is split into two sets of plug-ins under [source](source):
+
+- **Measurements - IS Pro Version 24.0**: built for InstrumentStudio Pro 2024 Q1 using the `ni-measurementlink-service` package. Includes Output Voltage Accuracy, Ripple, Line Regulation, and Efficiency and Load Regulation.
+- **Measurements - IS Pro Version 26.0**: built for InstrumentStudio Pro 2026 Q4 using the newer `ni-measurement-plugin-sdk-service` package. Includes Efficiency and Load Regulation and PSRR.
+
+Use the set that matches your installed InstrumentStudio Pro version. For the mapping between InstrumentStudio versions and Measurement Plug-In SDK for Python releases (for example, InstrumentStudio 2026 Q1 corresponds to SDK 3.1.0), see the [examples version table](https://github.com/ni/measurement-plugin-python#examples). The 24.0 plug-ins predate the SDK rename, so for InstrumentStudio 2024 Q1 use the older `ni-measurementlink-service` releases listed under "Older versions" in that table.
 
 ## Hardware Dependencies
 
@@ -31,10 +41,11 @@ Tested hardware setup:
 Install from NI Package Manager:
 
 - InstrumentStudio (2024 Q1 or higher)
-- Measurement Link (2024 Q1 or higher)
+- Measurement Link (2024 Q1 or higher; 24.0 plug-ins only)
 - NI SDC Add-On (2023 Q4 or higher) (note: only if using DPI for DUT communication)
 - NI-DCPower (2023 Q4 or higher)
-- NI-Scope (2023 Q4 or higher) (note: required for ripple)
+- NI-FGEN (note: required for PSRR)
+- NI-Scope (2023 Q4 or higher) (note: required for PSRR and ripple)
 
 Download the latest NI package from the releases section of this repo or add the feed to NI Package Manager to get updates from this repo and other in this community. To use the NI Package Manager feeds, refer to this: [Subscribing to package feeds](https://github.com/NI-MeasurementLink-Plug-Ins/package-manager-feeds)
 
