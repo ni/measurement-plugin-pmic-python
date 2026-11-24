@@ -186,3 +186,4 @@ def power_off_dut(
 
     source_session.channels[source_channel_name].reset()
     load_session.channels[load_channel_name].reset()
+

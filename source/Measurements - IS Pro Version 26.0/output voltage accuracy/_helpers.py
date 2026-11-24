@@ -55,3 +55,4 @@ class TestStandSupport:
         if user_canceled:
             raise RuntimeError("File lookup canceled by user.")
         return absolute_path
+
