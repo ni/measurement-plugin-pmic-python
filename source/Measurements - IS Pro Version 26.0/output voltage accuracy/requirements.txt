@@ -1,0 +1,3 @@
+ni-measurement-plugin-sdk-service[nidcpower]>=3.1.0
+nidcpower>=1.4.0
+click>=8.1.0
