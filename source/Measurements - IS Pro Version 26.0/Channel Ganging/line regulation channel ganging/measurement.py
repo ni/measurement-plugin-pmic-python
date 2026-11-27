@@ -344,6 +344,13 @@ def measure(
                 source.initiate()
                 load.wait_for_event(nidcpower.Event.SOURCE_COMPLETE)
 
+                sequence_timeout = len(voltage_values) * (source_delay + aperture_time) + 1.0
+                for channel in source.channels:
+                    channel.wait_for_event(
+                        nidcpower.Event.SEQUENCE_ITERATION_COMPLETE,
+                        timeout=sequence_timeout,
+                    )
+
                 source_voltages = []
                 load_voltages = []
                 for _ in voltage_values:

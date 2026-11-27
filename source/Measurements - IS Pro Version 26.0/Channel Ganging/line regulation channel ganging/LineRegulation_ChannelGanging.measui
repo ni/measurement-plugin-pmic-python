@@ -8,7 +8,7 @@
 		<ParsableNamespace AssemblyFileVersion="9.22.1.50141" FeatureSetName="Editor" Name="http://www.ni.com/PlatformFramework" OldestCompatibleVersion="8.1.0.49152" Version="8.1.0.49152" />
 		<ApplicationVersionInfo Build="26.8.1.50141" Name="Measurement Plug-In UI Editor" Version="26.8.1.50141" />
 	</SourceModelFeatureSet>
-	<Screen ClientId="{466b5677-15f9-4ed4-b721-364ee8996a0c}" DisplayName="Line Regulation Channel Ganging (Py)" Id="3656de7c9d6a42cfb27ea41494f0ed46" ServiceClass="LineRegulation_ChannelGanging_Python" xmlns="http://www.ni.com/InstrumentFramework/ScreenDocument">
+	<Screen ClientId="{033b7adf-447f-4893-bc83-6791ad2cebfc}" DisplayName="Line Regulation Channel Ganging (Py)" Id="3656de7c9d6a42cfb27ea41494f0ed46" ServiceClass="LineRegulation_ChannelGanging_Python" xmlns="http://www.ni.com/InstrumentFramework/ScreenDocument">
 		<ScreenSurface Height="[float]735" Id="a7dfabef34dd41359b7082a8ab92e971" Left="[float]0" PanelSizeMode="Fixed" Top="[float]0" Width="[float]1336" xmlns="http://www.ni.com/ConfigurationBasedSoftware.Core">
 			<Line ArrowLocation="[ArrowLocation]None" Data="[PathGeometry]M 0,608.025818 L 0,0" Fill="[SMSolidColorBrush]#ff2b3033" Height="[float]608.0258" Id="c34a33d08fdf4268a6efc6765f24a5b5" Left="[float]894" ShapeBuilder="[string]" Stroke="[SMSolidColorBrush]#ffffffff" StrokeThickness="[float]2" Top="[float]17" Width="[float]0" xmlns="http://www.ni.com/PlatformFramework" />
 			<TabControl BaseName="[string]Tab" Height="[float]598" Id="b9e562a885e04ea0a9397330edb6cc3f" Label="[UIModel]e3e49a7ba0374eb58701bfa87f0bfcc4" Left="[float]4" SelectedIndex="[int]1" Top="[float]20" Width="[float]884" xmlns="http://www.ni.com/Controls.LabVIEW.Design">

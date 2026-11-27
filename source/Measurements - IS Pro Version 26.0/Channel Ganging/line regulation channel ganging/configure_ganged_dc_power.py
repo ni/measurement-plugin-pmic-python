@@ -277,14 +277,15 @@ class GangedSession:
 
     def shutdown(self) -> None:
         """Abort, power off and reset every channel, ignoring driver errors."""
-        for step in (
-            self.abort,
-            lambda: self.set_output_enabled(False),
-            lambda: self.set_output_connected(False),
-            self._reset,
+        for operation in (
+            lambda channel: channel.abort(),
+            lambda channel: setattr(channel, "output_enabled", False),
+            lambda channel: setattr(channel, "output_connected", False),
+            lambda channel: channel.reset(),
         ):
-            with contextlib.suppress(nidcpower.Error):
-                step()
+            for channel in self.channels:
+                with contextlib.suppress(nidcpower.Error):
+                    operation(channel)
 
     def _reset(self) -> None:
         for channel in self.channels:
