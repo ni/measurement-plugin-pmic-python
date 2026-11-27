@@ -7,7 +7,7 @@ import sys
 import click
 import ni_measurement_plugin_sdk_service as nims
 import nidcpower
-from ganged_dc_power import (
+from configure_ganged_dc_power import (
     build_terminal_name,
     calculate_sweep_values,
     calculate_voltage_deviation,
@@ -35,7 +35,7 @@ measurement_service = nims.MeasurementService(
 MeasurementResult = tuple[list[float], list[float], list[float], DoubleXYData, DoubleXYData]
 
 
-def _settle(ganged: GangedSession) -> None:
+def _enable_and_settle_ganged_output(ganged: GangedSession) -> None:
     """Enable the output and apply the settings for the DUT setup time."""
     ganged.set_output_enabled(True)
     ganged.configure_triggers(nidcpower.MeasureWhen.AUTOMATICALLY_AFTER_SOURCE_COMPLETE)
@@ -45,7 +45,7 @@ def _settle(ganged: GangedSession) -> None:
     ganged.abort()
 
 
-def _start_source(
+def _configure_and_settle_source(
     source: GangedSession,
     sense: SenseMode,
     voltage_level_range: float,
@@ -69,10 +69,10 @@ def _start_source(
     source.configure_source_loop(
         transient_response, custom_response, dut_setup_time, None, is_current_loop=False
     )
-    _settle(source)
+    _enable_and_settle_ganged_output(source)
 
 
-def _start_load(
+def _configure_and_settle_load(
     load: GangedSession,
     sense: SenseMode,
     voltage_limit_low: float,
@@ -96,7 +96,7 @@ def _start_load(
     load.configure_source_loop(
         transient_response, custom_response, dut_setup_time, None, is_current_loop=True
     )
-    _settle(load)
+    _enable_and_settle_ganged_output(load)
 
 
 @measurement_service.register_measurement
@@ -275,8 +275,13 @@ def measure(
                 source_system_configuration, resolve_pins(session_infos, source_pins)
             )
             load = GangedSession(load_system_configuration, resolve_pins(session_infos, load_pins))
+            resolved = [*source.ganged_channels, *load.ganged_channels]
+            if len({(item.device, item.channel) for item in resolved}) != len(resolved):
+                raise ValueError(
+                    "Each source and load pin must use a different NI-DCPower channel."
+                )
             try:
-                _start_source(
+                _configure_and_settle_source(
                     source,
                     source_sense,
                     source_voltage_level_range,
@@ -289,7 +294,7 @@ def measure(
                     source_response,
                     dut_setup_time,
                 )
-                _start_load(
+                _configure_and_settle_load(
                     load,
                     load_sense,
                     load_voltage_limit_low,

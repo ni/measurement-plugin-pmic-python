@@ -96,6 +96,11 @@ class GangedChannel:
     device: str
     channel: str
 
+    @property
+    def channel_number(self) -> str:
+        """The channel number without any device prefix, used for trigger engine names."""
+        return self.channel.rpartition("/")[2]
+
 
 def resolve_pin(session_infos: Sequence[SessionInformation], pin: str) -> GangedChannel:
     """Resolve a pin to its single NI-DCPower session, device and channel."""
@@ -108,8 +113,8 @@ def resolve_pin(session_infos: Sequence[SessionInformation], pin: str) -> Ganged
     if len(matches) != 1:
         raise ValueError(f"Pin {pin!r} must map to exactly one NI-DCPower channel.")
     info, mapped_channel = matches[0]
-    device, _, channel = mapped_channel.rpartition("/")
-    resolved = GangedChannel(info.session, device or info.resource_name, channel)
+    device = mapped_channel.rpartition("/")[0]
+    resolved = GangedChannel(info.session, device or info.resource_name, mapped_channel)
     _logger.info("Pin %s resolved to device %s channel %s", pin, resolved.device, resolved.channel)
     return resolved
 
@@ -341,7 +346,7 @@ def build_terminal_name(ganged_channel: GangedChannel, local_terminal_name: str)
     if ganged_channel.session.instrument_model == PXI_4132_MODEL:
         return f"/{ganged_channel.device}/{local_terminal_name}"
     return build_trigger_terminal(
-        ganged_channel.device, ganged_channel.channel, local_terminal_name
+        ganged_channel.device, ganged_channel.channel_number, local_terminal_name
     )
 
 
