@@ -1,0 +1,20 @@
+{
+  "services": [
+    {
+      "displayName": "Efficiency And Load Regulation Channel Ganging (Py)",
+      "serviceClass": "EfficiencyAndLoadRegulation_ChannelGanging_Python",
+      "descriptionUrl": "",
+      "providedInterfaces": [
+        "ni.measurementlink.measurement.v1.MeasurementService",
+        "ni.measurementlink.measurement.v2.MeasurementService"
+      ],
+      "path": "start.bat",
+      "version": "1.0.0.0",
+      "annotations": {
+        "ni/service.description": "Efficiency and load regulation measurement with multiple power supplies and e-loads for PMIC.",
+        "ni/service.collection": "PMIC - GANGING/STACKING",
+        "ni/service.tags": []
+      }
+    }
+  ]
+}
